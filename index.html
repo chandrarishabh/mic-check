@@ -72,7 +72,6 @@
                 <button id="dst">Decrease</button>
                 <button id="ist">Increase</button>
             </div>
-
         </div>
     </div>
     </div>
@@ -165,7 +164,6 @@
                     renderSettings();
                 };
             }
-
             increasePollIntervalBtn.addEventListener('click', incrementState('currentPollInterval', TIME_JUMP_UNIT));
             decreasePollIntervalBtn.addEventListener('click', decrementState('currentPollInterval', TIME_JUMP_UNIT));
             increaseStuckTimeoutBtn.addEventListener('click', incrementState('stuckTimeout', TIME_JUMP_UNIT));
@@ -174,10 +172,7 @@
             renderSettings();
             testGUM().then(appendToTimelineContainerDiv);
             startPolling();
-
         })();
-       
-
     </script>
 </body>
 </html>
