@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mic Test</title>
+    <style>
+        :root{
+            font-family:Arial, Helvetica, sans-serif;
+        }
+        p {
+            margin-block: 2px;
+        }
+        h1 {
+            margin-inline-start: 2rem;
+        }
+        #root {
+            padding-inline: 5rem;
+            padding-block: 3rem;
+        }
+        #container {
+            display: flex;
+        }
+        #settings {
+            margin-inline-start: 5rem;
+            height: fit-content;
+        }
+        #stats {
+            width: 70%;
+        }
+        #timelineContainer {
+            display: flex;
+            flex-direction: column-reverse;
+        }
+        .shadowBox {
+            padding: 2rem;
+            box-shadow: rgba(0, 0, 0, 0.24) 0px 3px 8px;
+            border-radius: 1rem;
+            margin: 2rem;
+        }
+        .box {
+            margin-block: 1rem;
+        }
+      </style>
+</head>
+<body>
+    <div id="root">
+        <h1>Sprinklr Microphone Check</h1>
+        <div id="container">
+        <div id="stats">
+            <div class="shadowBox">            
+            <h3>Summary</h3>
+            <p>gUM Resolved Percentage - <span id="resolvePercentage">?</span>%</p>
+            <p>gUM Rejected Percentage - <span id="rejectedPercentage">?</span>%</p>
+            <p>gUM Stuck Percentage - <span id="stuckPercentage">?</span>%</p>
+            </div>
+            <div class="shadowBox">            
+            <h3>Timeline</h3>
+            <div id="timelineContainer"></div>
+            </div>
+        </div>
+        <div id="settings" class="shadowBox">
+            <h3>Settings</h3>
+            <div class="box">
+                <p>Current gUM poll interval - <span id="currentPollInterval">?</span> seconds</p>
+                <button id="dpi">Decrease</button>
+                <button id="ipi">Increase</button>
+            </div>
+            <div class="box">
+                <p>gUM stuck timeout - <span id="stuckTimeout">?</span> seconds</p>
+                <button id="dst">Decrease</button>
+                <button id="ist">Increase</button>
+            </div>
+
+        </div>
+    </div>
+    </div>
+    <script>
+        (function(){
+            // Data
+            const TIME_JUMP_UNIT = 1000;
+            const GUM_CONSTRAINTS = { audio:true };
+
+            const data = {
+                currentPollInterval : 5000,
+                stuckTimeout : 60000,
+                requestCount : 0,
+                rejectedCount : 0,
+                stuckCount : 0,
+                resolvedCount : 0,
+            }
+            
+
+            // DOM Elements
+            const decreasePollIntervalBtn = document.getElementById('dpi');
+            const increasePollIntervalBtn = document.getElementById('ipi');
+            const decreaseStuckTimeoutBtn = document.getElementById('dst');
+            const increaseStuckTimeoutBtn = document.getElementById('ist');
+            const currentPollIntervalSpan =  document.getElementById('currentPollInterval');
+            const stuckTimeoutSpan =  document.getElementById('stuckTimeout');
+            const resolvePercentageSpan =  document.getElementById('resolvePercentage');
+            const rejectPercentageSpan =  document.getElementById('rejectedPercentage');
+            const stuckPercentageSpan =  document.getElementById('stuckPercentage');
+            const timelineContainerDiv = document.getElementById('timelineContainer');
+            
+            // DOM Manipulation
+            const renderSettings = () => {
+                decreasePollIntervalBtn.disabled = data.currentPollInterval - TIME_JUMP_UNIT <= 0 ;
+                decreaseStuckTimeoutBtn.disabled = data.stuckTimeout - TIME_JUMP_UNIT <= 0 ;
+                currentPollIntervalSpan.replaceChildren(document.createTextNode(data.currentPollInterval/1000));
+                stuckTimeoutSpan.replaceChildren(document.createTextNode(data.stuckTimeout/1000));
+            }
+
+            const appendToTimelineContainerDiv = result => {
+                const paragraphTag = document.createElement('p');
+                paragraphTag.textContent = `${new Date().toLocaleString()}: ${result}`;
+                timelineContainerDiv.append(paragraphTag);
+                
+                resolvePercentageSpan.innerText = ((data.resolvedCount/data.requestCount)*100).toFixed(2);
+                rejectPercentageSpan.innerText = ((data.rejectedCount/data.requestCount)*100).toFixed(2);
+                stuckPercentageSpan.innerText = ((data.stuckCount/data.requestCount)*100).toFixed(2);
+            }
+            
+            const testGUM = () => new Promise((resolve, reject)=>{
+                const resolveGUMTimer = setTimeout(()=>{
+                    data.stuckCount++;
+                    resolve(`gUM failed to resolve or reject within ${data.stuckTimeout} milliseconds.`)
+                }, data.stuckTimeout);
+
+                const startTime = Date.now();
+                data.requestCount++;
+                navigator.mediaDevices.getUserMedia(GUM_CONSTRAINTS).then(() => {
+                    const resolveDuration = Date.now() - startTime;
+                    clearTimeout(resolveGUMTimer);
+                    data.resolvedCount++;
+                    resolve(`gUM resolved in ${resolveDuration} milliseconds.`);
+                }).catch(()=>{
+                    const rejectDuration = Date.now() - startTime;
+                    clearTimeout(resolveGUMTimer);
+                    data.rejectedCount++;
+                    resolve(`gUM failed in ${rejectDuration} milliseconds.`);
+                });
+            });
+
+            const startPolling = () => {
+                data.pollTimer = setTimeout(() => {
+                    testGUM().then(appendToTimelineContainerDiv);
+                    startPolling();
+                }, [data.currentPollInterval]);
+            }
+
+            const stopPolling = () => {
+                clearTimeout(data.pollTimer);
+            }
+
+
+            const incrementState = (key, val) => () => { 
+                data[key]+=val;
+                renderSettings();
+            };
+            const decrementState = (key, val) => () => {
+                if(data[key]-val>0){
+                    data[key]-=val;
+                    renderSettings();
+                };
+            }
+
+            increasePollIntervalBtn.addEventListener('click', incrementState('currentPollInterval', TIME_JUMP_UNIT));
+            decreasePollIntervalBtn.addEventListener('click', decrementState('currentPollInterval', TIME_JUMP_UNIT));
+            increaseStuckTimeoutBtn.addEventListener('click', incrementState('stuckTimeout', TIME_JUMP_UNIT));
+            decreaseStuckTimeoutBtn.addEventListener('click', decrementState('stuckTimeout', TIME_JUMP_UNIT));
+
+            renderSettings();
+            testGUM().then(appendToTimelineContainerDiv);
+            startPolling();
+
+        })();
+       
+
+    </script>
+</body>
+</html>
